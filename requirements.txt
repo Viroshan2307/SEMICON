@@ -1,0 +1,11 @@
+# Core dependencies for training and evaluation
+torch>=2.0.0
+numpy>=1.24.0
+
+# Optional: only used if you want to cross-check the self-contained SSIM
+# implementation against the reference library (not required to run
+# train.py or evaluate.py -- both have their own verified SSIM built in)
+# pytorch-msssim>=1.0.0
+
+# Required only for visualizing results (sample_results.png generation)
+matplotlib>=3.7.0
