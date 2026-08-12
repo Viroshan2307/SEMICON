@@ -35,10 +35,11 @@ class WaferRestorationDataset(Dataset):
     see realistic noisy input, including values outside [0,1].
     """
 
-    def __init__(self, gt_dir, lr_dir, filenames):
+    def __init__(self, gt_dir, lr_dir, filenames, augment=False):
         self.gt_dir = gt_dir
         self.lr_dir = lr_dir
         self.filenames = filenames
+        self.augment = augment  # only True for the training split, never validation
 
     def __len__(self):
         return len(self.filenames)
@@ -47,6 +48,12 @@ class WaferRestorationDataset(Dataset):
         fname = self.filenames[idx]
         lr = np.load(os.path.join(self.lr_dir, fname)).astype(np.float32)
         gt = np.load(os.path.join(self.gt_dir, fname)).astype(np.float32)
+
+        if self.augment and np.random.rand() < 0.5:
+            # Flip BOTH images the same way -- they must stay aligned as a pair
+            lr = np.ascontiguousarray(lr[:, ::-1])
+            gt = np.ascontiguousarray(gt[:, ::-1])
+
         return torch.from_numpy(lr).unsqueeze(0), torch.from_numpy(gt).unsqueeze(0)
 
 
@@ -125,6 +132,12 @@ def main():
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
     parser.add_argument("--out", default="best_model.pt", help="Where to save the best checkpoint")
     parser.add_argument("--val_size", type=int, default=300, help="Number of samples held out for validation")
+    parser.add_argument("--base_channels", type=int, default=64, help="Model width")
+    parser.add_argument("--num_res_blocks", type=int, default=6, help="Model depth")
+    parser.add_argument("--l1_weight", type=float, default=0.5, help="Weight for L1 loss component")
+    parser.add_argument("--ssim_weight", type=float, default=0.5, help="Weight for SSIM loss component")
+    parser.add_argument("--augment", action="store_true", help="Enable random horizontal flip augmentation (train split only)")
+    parser.add_argument("--patience", type=int, default=7, help="Stop early if val loss doesn't improve for this many epochs")
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -135,23 +148,26 @@ def main():
     train_filenames, val_filenames = get_train_val_split(args.gt_dir, val_size=args.val_size)
     print(f"Train samples: {len(train_filenames)} | Val samples: {len(val_filenames)}")
 
-    train_dataset = WaferRestorationDataset(args.gt_dir, args.lr_dir, train_filenames)
-    val_dataset = WaferRestorationDataset(args.gt_dir, args.lr_dir, val_filenames)
+    train_dataset = WaferRestorationDataset(args.gt_dir, args.lr_dir, train_filenames, augment=args.augment)
+    val_dataset = WaferRestorationDataset(args.gt_dir, args.lr_dir, val_filenames, augment=False)
 
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=2)
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=2)
 
-    model = RestorationNet(base_channels=64, num_res_blocks=6).to(device)
+    model = RestorationNet(base_channels=args.base_channels, num_res_blocks=args.num_res_blocks).to(device)
     num_params = sum(p.numel() for p in model.parameters())
-    print(f"Model parameters: {num_params:,}")
+    print(f"Model parameters: {num_params:,} (base_channels={args.base_channels}, num_res_blocks={args.num_res_blocks})")
 
-    criterion = CombinedLoss()
+    criterion = CombinedLoss(l1_weight=args.l1_weight, ssim_weight=args.ssim_weight)
+    print(f"Loss weights: L1={args.l1_weight}, SSIM={args.ssim_weight}")
+    print(f"Augmentation: {'ON (random horizontal flip)' if args.augment else 'OFF'}")
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3)
 
     best_val_loss = float('inf')
+    epochs_without_improvement = 0
 
-    print(f"\nTraining for {args.epochs} epochs...\n")
+    print(f"\nTraining for up to {args.epochs} epochs (early stop after {args.patience} epochs without improvement)...\n")
 
     for epoch in range(1, args.epochs + 1):
         epoch_start = time.time()
@@ -188,11 +204,18 @@ def main():
         marker = ""
         if val_loss < best_val_loss:
             best_val_loss = val_loss
+            epochs_without_improvement = 0
             torch.save(model.state_dict(), args.out)
             marker = "  <- saved best"
+        else:
+            epochs_without_improvement += 1
 
         print(f"Epoch {epoch:2d}/{args.epochs} | Train loss: {train_loss:.4f} | "
               f"Val loss: {val_loss:.4f} | Time: {epoch_time:.1f}s{marker}")
+
+        if epochs_without_improvement >= args.patience:
+            print(f"\nEarly stopping: no improvement for {args.patience} epochs.")
+            break
 
     print(f"\nTraining complete. Best model saved to: {args.out}")
     print(f"Best validation loss: {best_val_loss:.4f}")

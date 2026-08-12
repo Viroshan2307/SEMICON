@@ -222,6 +222,8 @@ def main():
                          help="Evaluate on ALL data instead of just the held-out validation split. "
                               "Not recommended for reporting scores -- inflates results since it "
                               "includes data the model was trained on.")
+    parser.add_argument("--base_channels", type=int, default=64, help="Must match the architecture used in training")
+    parser.add_argument("--num_res_blocks", type=int, default=6, help="Must match the architecture used in training")
     args = parser.parse_args()
 
     if args.mode == "val" and args.gt_dir is None:
@@ -230,7 +232,7 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    model = RestorationNet(base_channels=64, num_res_blocks=6).to(device)
+    model = RestorationNet(base_channels=args.base_channels, num_res_blocks=args.num_res_blocks).to(device)
     model.load_state_dict(torch.load(args.weights, map_location=device))
     print(f"Loaded weights from: {args.weights}")
 
