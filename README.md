@@ -99,7 +99,7 @@ The `dataset/` folder (3,200 paired GT/NoisyLR `.npy` files) is **not included i
 
 1. Obtain `train.zip` from the official hackathon dataset source
 2. Extract it so you have `dataset/GT/` and `dataset/NoisyLR/`, each containing matching `.npy` files
-3. Place the `dataset/` folder in the project root before running `train_teammate_arch_v3.py` or `evaluate_final.py`
+3. Place the `dataset/` folder in the project root before running `train.py` or `evaluate_final.py`
 
 ---
 
@@ -108,9 +108,9 @@ The `dataset/` folder (3,200 paired GT/NoisyLR `.npy` files) is **not included i
 ```
 restoration_project/
 ├── evaluate_final.py         # STANDALONE evaluation script (required format) -- run this to reproduce results
-├── train_teammate_arch_v3.py # Training script (reproduces best_model_v3.pth from scratch)
+├── train.py # Training script (reproduces best_model_v3.pth from scratch)
 ├── compute_lpips.py           # Computes LPIPS metric on the validation split
-├── teammate_model.py           # Model architecture (HighResSemiconductorNet)
+├── model_architecture.py           # Model architecture (HighResSemiconductorNet)
 ├── best_model_v3.pth            # Final trained model weights
 ├── requirements.txt               # Python dependencies (pip freeze)
 ├── sample_results/                 # Visual before/after comparison images
@@ -139,13 +139,13 @@ This loads the trained model and runs inference on every `.npy` file found in `-
 ### Retrain from scratch
 
 ```bash
-python train_teammate_arch_v3.py --gt_dir dataset/GT --lr_dir dataset/NoisyLR --epochs 60 --patience 10 --out best_model_v3.pth
+python train.py --gt_dir dataset/GT --lr_dir dataset/NoisyLR --epochs 60 --patience 10 --out best_model_v3.pth
 ```
 
 ### Compute PSNR/SSIM on the validation split
 
 ```bash
-python verify_teammate_model.py --weights best_model_v3.pth --gt_dir dataset/GT --lr_dir dataset/NoisyLR --tta
+python evaluate_metrics.py --weights best_model_v3.pth --gt_dir dataset/GT --lr_dir dataset/NoisyLR --tta
 ```
 
 ### Compute LPIPS on the validation split

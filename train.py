@@ -15,7 +15,7 @@ maximizing one at the expense of the other.
 Everything else is identical to train_teammate_arch.py: same seed=42
 split, same architecture (HighResSemiconductorNet), same early stopping
 (patience=10), same "best checkpoint by SSIM" selection, same
-compatibility with verify_teammate_model.py.
+compatibility with evaluate_metrics.py.
 
 Usage:
   python train_teammate_arch_v3.py --gt_dir <path> --lr_dir <path> --out best_model_v3.pth
@@ -31,7 +31,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 
-from teammate_model import HighResSemiconductorNet
+from model_architecture import HighResSemiconductorNet
 
 
 class WaferRestorationDataset(Dataset):
@@ -57,7 +57,7 @@ class WaferRestorationDataset(Dataset):
 
 
 def get_val_filenames(gt_dir, val_size=300, seed=42):
-    """EXACT same split as our train.py/evaluate.py/verify_teammate_model.py."""
+    """EXACT same split as our train.py/evaluate.py/evaluate_metrics.py."""
     all_filenames = sorted(f for f in os.listdir(gt_dir) if f.endswith(".npy") and not f.startswith("._"))
     rng = np.random.default_rng(seed=seed)
     shuffled = all_filenames.copy()

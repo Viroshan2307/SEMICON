@@ -1,5 +1,5 @@
 """
-verify_teammate_model.py
+evaluate_metrics.py
 
 Independently verifies the teammate's trained model against OUR exact
 held-out validation split (same seed=42, same 300 images used to score
@@ -13,8 +13,8 @@ own split, "performed well" can't be honestly compared to our own
 28.36 dB / 0.7762 baseline.
 
 Usage:
-  python verify_teammate_model.py --weights best_model.pth --gt_dir dataset/GT --lr_dir dataset/NoisyLR
-  python verify_teammate_model.py --weights best_model.pth --gt_dir dataset/GT --lr_dir dataset/NoisyLR --tta
+  python evaluate_metrics.py --weights best_model.pth --gt_dir dataset/GT --lr_dir dataset/NoisyLR
+  python evaluate_metrics.py --weights best_model.pth --gt_dir dataset/GT --lr_dir dataset/NoisyLR --tta
 """
 
 import argparse
@@ -25,7 +25,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from teammate_model import HighResSemiconductorNet
+from model_architecture import HighResSemiconductorNet
 
 
 def get_val_filenames(gt_dir, val_size=300, seed=42):

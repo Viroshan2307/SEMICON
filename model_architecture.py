@@ -1,5 +1,5 @@
 """
-teammate_model.py
+model_architecture.py
 
 Architecture from teammate's script: a NAFNet-style U-Net with channel
 attention, encoder-decoder structure, and PixelShuffle upsampling.

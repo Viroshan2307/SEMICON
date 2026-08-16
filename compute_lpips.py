@@ -23,7 +23,7 @@ import os
 import numpy as np
 import torch
 
-from teammate_model import HighResSemiconductorNet
+from model_architecture import HighResSemiconductorNet
 
 try:
     import lpips
@@ -35,7 +35,7 @@ except ImportError:
 
 
 def get_val_filenames(gt_dir, val_size=300, seed=42):
-    """EXACT same split as train.py/evaluate.py/verify_teammate_model.py --
+    """EXACT same split as train.py/evaluate.py/evaluate_metrics.py --
     must match for LPIPS to be comparable to our PSNR/SSIM numbers."""
     all_filenames = sorted(f for f in os.listdir(gt_dir) if f.endswith(".npy") and not f.startswith("._"))
     rng = np.random.default_rng(seed=seed)
@@ -116,7 +116,7 @@ def main():
     print(f"Average LPIPS ({args.net}): {avg_lpips:.4f}  (lower is better)")
     print("=" * 50)
     print()
-    print("Use this alongside PSNR/SSIM from verify_teammate_model.py for your results slide:")
+    print("Use this alongside PSNR/SSIM from evaluate_metrics.py for your results slide:")
     print(f"  e.g. 'PSNR: XX.XX dB | SSIM: 0.XXXX | LPIPS: {avg_lpips:.4f}'")
 
 

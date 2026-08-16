@@ -29,7 +29,7 @@ import time
 import numpy as np
 import torch
 
-from teammate_model import HighResSemiconductorNet
+from model_architecture import HighResSemiconductorNet
 
 
 def load_model(weights_path, device):
