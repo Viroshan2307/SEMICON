@@ -95,31 +95,38 @@ def main():
     print(f"TTA (test-time flip averaging): {'ON' if args.tta else 'OFF'}")
     print()
 
-    inference_times = []
+    model_only_times = []
+    pipeline_times = []
     for i, fname in enumerate(filenames, start=1):
         in_path = os.path.join(args.input_dir, fname)
         out_path = os.path.join(args.output_dir, fname)
+
+        pipeline_start = time.time()
 
         lr_array = np.load(in_path).astype(np.float32)
         if lr_array.ndim != 2:
             raise ValueError(f"Expected a 2D array in {fname}, got shape {lr_array.shape}")
 
-        start = time.time()
+        model_start = time.time()
         restored = restore_image(model, lr_array, device, tta=args.tta)
         if device.type == "cuda":
             torch.cuda.synchronize()
-        inference_times.append(time.time() - start)
+        model_only_times.append(time.time() - model_start)
 
         np.save(out_path, restored)
+        pipeline_times.append(time.time() - pipeline_start)
 
         if i % 50 == 0 or i == len(filenames):
             print(f"  Processed {i}/{len(filenames)} images...")
 
-    avg_time_ms = (sum(inference_times) / len(inference_times)) * 1000
+    avg_model_ms = (sum(model_only_times) / len(model_only_times)) * 1000
+    avg_pipeline_ms = (sum(pipeline_times) / len(pipeline_times)) * 1000
     print()
     print("=" * 50)
     print(f"Done. Restored {len(filenames)} images.")
-    print(f"Average inference time: {avg_time_ms:.2f} ms/image")
+    print(f"Batch size: 1 (single-image inference loop)")
+    print(f"Average model-only inference time: {avg_model_ms:.2f} ms/image")
+    print(f"Average end-to-end pipeline time (load + inference + save): {avg_pipeline_ms:.2f} ms/image")
     print(f"Outputs written to: {args.output_dir}")
     print("=" * 50)
 

@@ -53,7 +53,9 @@ Random horizontal and vertical flips (applied identically to both the noisy inpu
 | LR Schedule              | CosineAnnealingLR                              |
 | Hardware                 | Kaggle, NVIDIA Tesla T4 x2                     |
 | Training time            | ~70.9 minutes (60 epochs x ~70.3s/epoch)       |
-| Inference (TTA on)       | 19.67 ms/image (GPU)                           |
+| Batch size (inference)   | 1 (single-image inference loop)                |
+| Model-only inference (TTA on)     | 20.56 ms/image (GPU)                 |
+| End-to-end pipeline (load + inference + save, TTA on) | 25.63 ms/image (GPU) |
 
 **Note on validation split:** we deliberately use a random shuffle with a fixed seed (42), rather than sorting filenames and taking a tail slice, because the latter risks a biased, non-representative validation set if filenames correlate with acquisition batch or order. We confirmed this empirically -- the same trained weights scored meaningfully differently depending on which split evaluated them (see Model History table). All results below use our seed=42 split for fair, consistent comparison.
 
@@ -68,7 +70,10 @@ Evaluated on our **300-sample held-out validation set** (seed=42 split, never se
 | PSNR   | 28.59 dB |
 | SSIM   | 0.7970 |
 | LPIPS (AlexNet backbone) | 0.2433 (lower is better) |
-| Inference speed (GPU, with TTA) | 19.67 ms/image |
+| Model-only inference speed (GPU, with TTA) | 20.56 ms/image |
+| **End-to-end pipeline speed** (load + inference + save, GPU, with TTA, batch size 1) | **25.63 ms/image** |
+
+Verified on the official 400-image hidden test set (`Test_NoisyLR`) via `evaluate_final.py` — all 400 restored outputs generated successfully, output count confirmed to match input count.
 
 ### Model History -- Full Comparison
 
