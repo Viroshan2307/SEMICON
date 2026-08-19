@@ -13,10 +13,11 @@ models/best_model_v3.pth), runs inference on every .npy file found in
 no manual configuration, no internet access, and no user interaction
 required.
 
-Inputs: .npy files, float32, shape (128, 128), values roughly in [0, ~1.4]
-        (noisy/low-res, may exceed 1.0 due to noise overshoot).
-Outputs: .npy files, float32, shape (256, 256), values clamped to [0, 1],
-         no NaN/Inf, same filenames as input.
+Inputs: .npy files, float32, shape (128,128) or (256,256), values roughly in
+        [0, ~1.4] (noisy/low-res, may exceed 1.0 due to noise overshoot).
+Outputs: .npy files, float32, upscaled 2x from input (e.g. 128x128->256x256,
+         256x256->512x512), values clamped to [0, 1], no NaN/Inf, same
+         filenames as input.
 """
 
 import os
@@ -43,8 +44,8 @@ def load_model(weights_path, device):
 
 
 def restore_image(model, lr_array, device, tta=True):
-    """Runs inference on a single (128,128) noisy/low-res array,
-    returns a (256,256) restored array clamped to [0,1] with no NaN/Inf."""
+    """Runs inference on a single noisy/low-res array (any size),
+    returns a 2x-upscaled restored array clamped to [0,1] with no NaN/Inf."""
     lr_tensor = torch.from_numpy(lr_array).unsqueeze(0).unsqueeze(0).to(device)
 
     with torch.no_grad():
@@ -133,3 +134,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
