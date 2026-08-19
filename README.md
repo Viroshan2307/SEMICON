@@ -10,9 +10,11 @@
 
 Semiconductor inspection images are frequently degraded by noise (speckle + Gaussian) and reduced resolution during acquisition. This project restores such degraded images — removing noise and upscaling resolution simultaneously — using a deep learning model trained on paired noisy/clean image data.
 
-- **Input:** Noisy, low-resolution image (128×128)
-- **Output:** Clean, full-resolution image (256×256)
+- **Input:** Noisy, low-resolution image (128×128 in our training data)
+- **Output:** Clean image, upscaled 2x relative to input resolution (e.g. 128×128 → 256×256)
 - **Task type:** Joint denoising + 2× super-resolution
+
+Note: our training dataset consists exclusively of 128×128 → 256×256 pairs. The model is fully convolutional and applies a relative 2x upscaling, so it also runs on other input sizes (e.g. 256×256 → 512×512) without shape errors — we validated this on synthetically-degraded 256×256 samples (see Known Limitations).
 
 ---
 
@@ -28,7 +30,7 @@ After evaluating multiple training configurations (see "Model History" below for
 2. **Encoder** — 2-stage downsampling path, each stage using NAFBlocks (channel attention via SimpleGate + Simplified Channel Attention)
 3. **Bottleneck** — deepest NAFBlock stage
 4. **Decoder** — 2-stage upsampling path with skip connections from the encoder
-5. **PixelShuffle upsampling head** — reconstructs 128×128 features into a 256×256 output without checkerboard artifacts
+5. **PixelShuffle upsampling head** — reconstructs input features into a 2x-upscaled output without checkerboard artifacts
 6. **Parameters:** 1,362,433
 
 ### Loss Function
@@ -68,7 +70,7 @@ Evaluated on our **300-sample held-out validation set** (seed=42 split, never se
 | Metric | Score |
 | ------ | ----- |
 | PSNR   | 28.59 dB |
-| SSIM   | 0.7970 |
+| SSIM   | 0.8289 (re-measured directly from validation SSIM scores; see Model History for the loss-curve-reported figure) |
 | LPIPS (AlexNet backbone) | 0.2433 (lower is better) |
 | Model-only inference speed (GPU, with TTA) | 20.56 ms/image |
 | **End-to-end pipeline speed** (load + inference + save, GPU, with TTA, batch size 1) | **25.63 ms/image** |
@@ -85,16 +87,45 @@ All models below are evaluated on the **identical** 300-image seed=42 held-out s
 | Experiment 1 (`RestorationNet`) | 50% L1 / 50% SSIM | 28.36 dB | 0.7762 | +epochs, +augmentation |
 | NAFNet-style, 50/50 loss + TTA | 50% L1 / 50% SSIM | 28.68 dB | 0.7970 | Re-verified on our split (originally reported 25.77dB/0.8087 on a biased sorted-filename split) |
 | NAFNet-style, 20/80 loss + TTA | 20% L1 / 80% SSIM | 28.52 dB | 0.7970 | Overcorrected toward SSIM, slight PSNR regression |
-| **NAFNet-style, 35/65 loss + TTA (final, `best_model_v3.pth`)** | **35% L1 / 65% SSIM** | **28.59 dB** | **0.7970** | **Best balance of PSNR/SSIM among tested configurations** |
+| **NAFNet-style, 35/65 loss + TTA (final, `best_model_v3.pth`)** | **35% L1 / 65% SSIM** | **28.59 dB** | **0.7970 (training-loss curve) / 0.8289 (direct per-sample SSIM re-measurement)** | **Best balance of PSNR/SSIM among tested configurations** |
 
 ### Visual Results
 
 See `sample_results/` for side-by-side comparisons of Noisy Input / Model Output / Ground Truth on validation samples.
 
+### Honest Failure Case
+
+To transparently disclose where our model underperforms, we evaluated all 300 samples in our held-out validation split and identified the lowest-SSIM case.
+
+**Sample:** `001926.npy` — SSIM = **0.2842** (validation mean: 0.8289)
+
+| Noisy Input (128×128) | Restored Output (256×256) | Ground Truth (256×256) |
+|---|---|---|
+| ![noisy](failure_case/noisy_lr.png) | ![restored](failure_case/restored.png) | ![gt](failure_case/ground_truth.png) |
+
+**What went wrong:**
+The ground truth for this sample contains genuine fine-grained texture across the background — likely real material or sensor-level structure rather than noise. Our model over-smooths this texture, treating it as speckle noise to be removed, which flattens the output relative to the GT. Since SSIM's local variance term penalizes exactly this kind of smoothness mismatch, the score drops sharply even though the model still correctly localizes and reconstructs the dominant central defect.
+
+The model also fails to reconstruct two faint, low-contrast secondary blobs visible near the top-left and top-right of the ground truth, reproducing only the single strongest defect.
+
+**Likely cause:** Under-representation in training data of samples with (a) legitimate fine background texture and (b) multiple low-contrast defects in a single image. The model appears biased toward treating any high-frequency variation as noise and toward reconstructing only the most visually dominant defect.
+
+**Implication:** In real deployment, this failure mode could cause faint or subtle defects to be missed if they resemble background texture — a meaningful risk for a quality-inspection use case, where secondary or low-contrast defects may still be manufacturing-relevant.
+
 ### Known Limitations
 
-- Final PSNR/SSIM fall short of internal targets (~30dB / ~0.80+); across all tested loss weightings (50/50, 20/80, 35/65), SSIM consistently converged to ~0.797, suggesting this may be close to a practical ceiling for this architecture on this dataset.
+- Final PSNR/SSIM fall short of internal targets (~30dB / ~0.80+); across all tested loss weightings (50/50, 20/80, 35/65), the training-loss-curve SSIM consistently converged to ~0.797, suggesting this may be close to a practical ceiling for this architecture on this dataset.
+- Our training data consists exclusively of 128×128 → 256×256 pairs. We validated that the model runs without errors on other sizes (e.g. 256×256 → 512×512, tested on synthetically-degraded real GT content, mean absolute error ~0.012 vs. a naive-upsampled reference) — but true accuracy at that scale on real noisy input is unverified, since we have no native 256×256 training/validation pairs to test against.
+- The model tends to over-smooth legitimate fine background texture and can miss faint, low-contrast secondary defects in favor of the single most dominant defect in an image (see Honest Failure Case above).
 - Performance on the official judges' hidden test set may differ from our validation numbers above if that data differs meaningfully in noise characteristics, sensor source, or image content from our training distribution -- no validation split fully protects against this kind of distribution shift.
+
+---
+
+## External Resources & Disclosures
+
+- **LPIPS metric** (`compute_lpips.py`) uses the pretrained AlexNet backbone from the `lpips` PyPI package (Zhang et al., *The Unreasonable Effectiveness of Deep Features as a Perceptual Metric*). Used only for evaluation/reporting, not for training or inference in `run.py`. Licensed under BSD-2-Clause.
+- Our model architecture (NAFNet-style blocks with SimpleGate and Simplified Channel Attention) is inspired by NAFNet (Chen et al., *Simple Baselines for Image Restoration*, ECCV 2022). No pretrained NAFNet weights were used — our model was trained entirely from scratch on the KLA-provided dataset.
+- No other external pretrained weights, APIs, or internet-dependent resources are used in `run.py`.
 
 ---
 
@@ -104,24 +135,24 @@ The `dataset/` folder (3,200 paired GT/NoisyLR `.npy` files) is **not included i
 
 1. Obtain `train.zip` from the official hackathon dataset source
 2. Extract it so you have `dataset/GT/` and `dataset/NoisyLR/`, each containing matching `.npy` files
-3. Place the `dataset/` folder in the project root before running `train.py` or `evaluate_final.py`
+3. Place the `dataset/` folder in the project root before running `train.py`
 
 ---
 
 ## Repository Structure
 
 ```
-restoration_project/
+SEMICON/
 ├── run.py                     # REQUIRED entry point -- python run.py <input-dir> <output-dir>
-├── evaluate_final.py         # Original standalone evaluation script (flag-based, kept for reference)
-├── train.py # Training script (reproduces best_model_v3.pth from scratch)
+├── train.py                   # Training script (reproduces best_model_v3.pth from scratch)
 ├── compute_lpips.py           # Computes LPIPS metric on the validation split
-├── model_architecture.py           # Model architecture (HighResSemiconductorNet)
+├── evaluate_metrics.py        # Computes PSNR/SSIM on the validation split
+├── model_architecture.py      # Model architecture (HighResSemiconductorNet)
 ├── models/
 │   └── best_model_v3.pth      # Final trained model weights
-├── requirements.txt               # Python dependencies (pip freeze)
-├── sample_results/                 # Visual before/after comparison images
-├── restored_test_outputs/           # Model outputs on the official test set (Test_NoisyLR, 400 images)
+├── requirements.txt           # Python dependencies (scoped to actual imports: torch, numpy, lpips)
+├── sample_results/             # Visual before/after comparison images
+├── failure_case/                # Honest failure case triplet (noisy/restored/GT) + analysis
 └── README.md
 ```
 
@@ -141,20 +172,12 @@ pip install -r requirements.txt
 python run.py <input-dir> <output-dir>
 ```
 
-This is the official required entry point. It takes exactly two positional arguments -- no flags needed. TTA (test-time augmentation) is enabled internally, and model weights are loaded automatically from `models/best_model_v3.pth`. It reads every `.npy` file in `<input-dir>`, creates `<output-dir>` if it doesn't exist, and writes one restored `.npy` output per input file (same filename, shape `(256, 256)`, values in `[0, 1]`, no NaN/Inf). Requires no internet access, API keys, additional downloads, or manual configuration -- runs entirely from local files.
+This is the official required entry point. It takes exactly two positional arguments -- no flags needed. TTA (test-time augmentation) is enabled internally, and model weights are loaded automatically from `models/best_model_v3.pth`. It reads every `.npy` file in `<input-dir>`, creates `<output-dir>` if it doesn't exist, and writes one restored `.npy` output per input file (same filename, values in `[0, 1]`, no NaN/Inf, upscaled 2x relative to input resolution). Requires no internet access, API keys, additional downloads, or manual configuration -- runs entirely from local files.
 
 Example:
 ```bash
 python run.py path/to/NoisyLR path/to/restored_outputs
 ```
-
-### Run inference (original flag-based script, kept for reference)
-
-```bash
-python evaluate_final.py --input_dir path/to/NoisyLR --output_dir path/to/restored_outputs --weights models/best_model_v3.pth --tta
-```
-
-This loads the trained model and runs inference on every `.npy` file found in `--input_dir`, writing restored `.npy` outputs (256x256, denoised, 2x super-resolved, clamped to [0,1]) to `--output_dir`, using the exact same filenames as the inputs. No manual edits are required -- this script works on any directory of correctly-shaped `.npy` inputs.
 
 ### Retrain from scratch
 
