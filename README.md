@@ -206,8 +206,3 @@ python compute_lpips.py --weights models/best_model_v3.pth --gt_dir dataset/GT -
 
 ---
 
-## Team Notes
-
-*[Add anything else your team wants judges to know -- challenges faced, what you'd improve with more time, individual contributions, etc.]*
-
-*One methodological note: we identified and corrected a subtle but significant bias in an earlier training script's train/validation split (sorted-filename tail slice instead of random shuffle), which was silently understating model performance. All results in this README use a corrected, unbiased random split (seed=42) consistently across every model variant we tested.*
