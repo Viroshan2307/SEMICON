@@ -73,7 +73,7 @@ Evaluated on our **300-sample held-out validation set** (seed=42 split, never se
 | Model-only inference speed (GPU, with TTA) | 20.56 ms/image |
 | **End-to-end pipeline speed** (load + inference + save, GPU, with TTA, batch size 1) | **25.63 ms/image** |
 
-Verified on the official 400-image hidden test set (`Test_NoisyLR`) via `evaluate_final.py` — all 400 restored outputs generated successfully, output count confirmed to match input count.
+Verified on the official 400-image hidden test set (`Test_NoisyLR`) via `run.py` — all 400 restored outputs generated successfully, output count confirmed to match input count.
 
 ### Model History -- Full Comparison
 
@@ -112,11 +112,13 @@ The `dataset/` folder (3,200 paired GT/NoisyLR `.npy` files) is **not included i
 
 ```
 restoration_project/
-├── evaluate_final.py         # STANDALONE evaluation script (required format) -- run this to reproduce results
+├── run.py                     # REQUIRED entry point -- python run.py <input-dir> <output-dir>
+├── evaluate_final.py         # Original standalone evaluation script (flag-based, kept for reference)
 ├── train.py # Training script (reproduces best_model_v3.pth from scratch)
 ├── compute_lpips.py           # Computes LPIPS metric on the validation split
 ├── model_architecture.py           # Model architecture (HighResSemiconductorNet)
-├── best_model_v3.pth            # Final trained model weights
+├── models/
+│   └── best_model_v3.pth      # Final trained model weights
 ├── requirements.txt               # Python dependencies (pip freeze)
 ├── sample_results/                 # Visual before/after comparison images
 ├── restored_test_outputs/           # Model outputs on the official test set (Test_NoisyLR, 400 images)
@@ -133,10 +135,23 @@ restoration_project/
 pip install -r requirements.txt
 ```
 
-### Run inference / reproduce results (required evaluation script)
+### Run inference (required entry point)
 
 ```bash
-python evaluate_final.py --input_dir path/to/NoisyLR --output_dir path/to/restored_outputs --weights best_model_v3.pth --tta
+python run.py <input-dir> <output-dir>
+```
+
+This is the official required entry point. It takes exactly two positional arguments -- no flags needed. TTA (test-time augmentation) is enabled internally, and model weights are loaded automatically from `models/best_model_v3.pth`. It reads every `.npy` file in `<input-dir>`, creates `<output-dir>` if it doesn't exist, and writes one restored `.npy` output per input file (same filename, shape `(256, 256)`, values in `[0, 1]`, no NaN/Inf). Requires no internet access, API keys, additional downloads, or manual configuration -- runs entirely from local files.
+
+Example:
+```bash
+python run.py path/to/NoisyLR path/to/restored_outputs
+```
+
+### Run inference (original flag-based script, kept for reference)
+
+```bash
+python evaluate_final.py --input_dir path/to/NoisyLR --output_dir path/to/restored_outputs --weights models/best_model_v3.pth --tta
 ```
 
 This loads the trained model and runs inference on every `.npy` file found in `--input_dir`, writing restored `.npy` outputs (256x256, denoised, 2x super-resolved, clamped to [0,1]) to `--output_dir`, using the exact same filenames as the inputs. No manual edits are required -- this script works on any directory of correctly-shaped `.npy` inputs.
@@ -144,20 +159,20 @@ This loads the trained model and runs inference on every `.npy` file found in `-
 ### Retrain from scratch
 
 ```bash
-python train.py --gt_dir dataset/GT --lr_dir dataset/NoisyLR --epochs 60 --patience 10 --out best_model_v3.pth
+python train.py --gt_dir dataset/GT --lr_dir dataset/NoisyLR --epochs 60 --patience 10 --out models/best_model_v3.pth
 ```
 
 ### Compute PSNR/SSIM on the validation split
 
 ```bash
-python evaluate_metrics.py --weights best_model_v3.pth --gt_dir dataset/GT --lr_dir dataset/NoisyLR --tta
+python evaluate_metrics.py --weights models/best_model_v3.pth --gt_dir dataset/GT --lr_dir dataset/NoisyLR --tta
 ```
 
 ### Compute LPIPS on the validation split
 
 ```bash
 pip install lpips
-python compute_lpips.py --weights best_model_v3.pth --gt_dir dataset/GT --lr_dir dataset/NoisyLR --tta
+python compute_lpips.py --weights models/best_model_v3.pth --gt_dir dataset/GT --lr_dir dataset/NoisyLR --tta
 ```
 
 ---
