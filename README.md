@@ -1,8 +1,8 @@
 # AI-Based Restoration of Degraded Images for Semiconductor Inspection
 
 **KLA Hackathon 2026 — Track 1**
-**Team:** *[Add your team name here]*
-**Members:** *[Add teammate names here]* — Viroshan (Reg. No. 212224060304), *[Add others]*
+**Team:** Epoch_42
+**Members:**  — Viroshan (Reg. No. 212224060304), *[Add others]*
 
 ---
 
