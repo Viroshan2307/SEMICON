@@ -2,7 +2,6 @@
 
 **KLA Hackathon 2026 — Track 1**
 **Team:** Epoch_42
-**Members:**  — Viroshan (Reg. No. 212224060304), *[Add others]*
 
 ---
 
