@@ -1,7 +1,6 @@
 # AI-Based Restoration of Degraded Images for Semiconductor Inspection
 
 **KLA Hackathon 2026 — Track 1**
-**Team:** Epoch_42
 
 ---
 
